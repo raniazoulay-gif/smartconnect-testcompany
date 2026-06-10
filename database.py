@@ -198,7 +198,9 @@ def init_db():
                 week_1 INTEGER DEFAULT 0,
                 week_2 INTEGER DEFAULT 0,
                 week_3 INTEGER DEFAULT 0,
-                week_4 INTEGER DEFAULT 0
+                week_4 INTEGER DEFAULT 0,
+                week_5 INTEGER DEFAULT 0,
+                week_6 INTEGER DEFAULT 0
             )""",
             """CREATE TABLE IF NOT EXISTS visits (
                 id SERIAL PRIMARY KEY,
@@ -247,6 +249,9 @@ def init_db():
                 created_at TEXT NOT NULL
             )""",
             """ALTER TABLE users ADD COLUMN IF NOT EXISTS beep_sound INTEGER DEFAULT 4""",
+            """ALTER TABLE customers ADD COLUMN IF NOT EXISTS week_5 INTEGER DEFAULT 0""",
+            """ALTER TABLE customers ADD COLUMN IF NOT EXISTS week_6 INTEGER DEFAULT 0""",
+            """ALTER TABLE customers ADD COLUMN IF NOT EXISTS is_phone INTEGER DEFAULT 0""",
         ]
         for stmt in stmts:
             db.execute(stmt)
