@@ -8,8 +8,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+import io
 from fastapi.templating import Jinja2Templates
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 
@@ -373,6 +374,104 @@ async def api_customers_restore(request: Request, cid: int):
 
 
 # ── API — Trash List ──────────────────────────────────────────────────────────
+@admin_router.post("/api/import-excel")
+async def api_import_excel(request: Request, file: UploadFile = File(...)):
+    """ייבוא לקוחות מ-Excel — POST /admin/api/import-excel"""
+    if not _get_admin(request):
+        return JSONResponse({"error": "אין הרשאה"}, status_code=401)
+
+    try:
+        import openpyxl
+    except ImportError:
+        return JSONResponse({"error": "חסר מודול openpyxl — הרץ: pip install openpyxl"}, status_code=500)
+
+    contents = await file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    except Exception as e:
+        return JSONResponse({"error": f"שגיאה בקריאת קובץ Excel: {e}"}, status_code=400)
+
+    ws = wb.active
+    headers_row = [str(c.value or "").strip().lower() for c in ws[1]]
+
+    # מיפוי שמות עמודות ← גמיש
+    COL_MAP = {
+        "card_code":        ["card_code", "קוד לקוח", "קוד", "cardcode", "bp_code"],
+        "name":             ["name", "שם", "שם לקוח", "שם חנות", "customer_name"],
+        "city":             ["city", "עיר", "city"],
+        "address":          ["address", "כתובת", "street"],
+        "region":           ["region", "אזור", "סוכן"],
+        "delivery_day":     ["delivery_day", "יום אספקה", "delivery"],
+        "x_days":           ["x_days", "תדירות", "x days", "frequency"],
+        "visit_day":        ["visit_day", "יום ביקור", "visit day"],
+        "traffic_light":    ["traffic_light", "רמזור", "traffic"],
+        "assigned_visit_day": ["assigned_visit_day", "יום מוקצה", "assigned day"],
+    }
+
+    def find_col(field):
+        aliases = COL_MAP.get(field, [])
+        for alias in aliases:
+            if alias.lower() in headers_row:
+                return headers_row.index(alias.lower())
+        return None
+
+    col_idx = {field: find_col(field) for field in COL_MAP}
+
+    if col_idx["name"] is None:
+        return JSONResponse({"error": "לא נמצאה עמודת שם לקוח — ודא שיש עמודה 'name' או 'שם לקוח'"}, status_code=400)
+
+    def cell(row, field):
+        idx = col_idx.get(field)
+        if idx is None:
+            return None
+        v = row[idx].value
+        return str(v).strip() if v is not None else None
+
+    db = get_db()
+    inserted = 0
+    skipped  = 0
+    errors   = []
+
+    for row_num, row in enumerate(ws.iter_rows(min_row=2), start=2):
+        name = cell(row, "name")
+        if not name:
+            skipped += 1
+            continue
+        try:
+            db.execute(
+                """INSERT INTO customers
+                   (card_code, name, city, address, region, delivery_day,
+                    x_days, visit_day, traffic_light, assigned_visit_day)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    cell(row, "card_code"),
+                    name,
+                    cell(row, "city"),
+                    cell(row, "address"),
+                    cell(row, "region"),
+                    cell(row, "delivery_day"),
+                    int(cell(row, "x_days") or 0) if cell(row, "x_days") else None,
+                    cell(row, "visit_day"),
+                    cell(row, "traffic_light"),
+                    cell(row, "assigned_visit_day"),
+                )
+            )
+            inserted += 1
+        except Exception as e:
+            errors.append(f"שורה {row_num}: {e}")
+
+    db.commit()
+    db.close()
+
+    return JSONResponse({
+        "ok": True,
+        "inserted": inserted,
+        "skipped": skipped,
+        "errors": errors[:10],  # מקסימום 10 שגיאות בתצוגה
+        "message": f"יובאו {inserted} לקוחות בהצלחה"
+    })
+
+
 @admin_router.get("/api/trash")
 async def api_trash_list(request: Request):
     if not _get_admin(request):
