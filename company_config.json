@@ -1,0 +1,19 @@
+{
+  "company_name": "TestCompany",
+  "tagline": "FIELD MANAGEMENT",
+  "system_name": "SMART CONNECT",
+  "primary_color": "#802600",
+  "secondary_color": "#9e1a2e",
+  "agent_label": "סוכן",
+  "agents_label": "סוכנים",
+  "store_label": "חנות",
+  "stores_label": "חנויות",
+  "manager_email": "raniazoulay@gmail.com",
+  "agents": [
+    {
+      "name": "MIKI",
+      "username": "miki",
+      "password": "7777"
+    }
+  ]
+}
