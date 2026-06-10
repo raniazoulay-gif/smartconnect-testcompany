@@ -181,6 +181,8 @@ tr.deleted-row td{opacity:0.4}
     <option value="ה">חמישי</option>
   </select>
   <button class="add-btn" onclick="openAdd()">+ הוסף לקוח</button>
+  <button class="add-btn" style="background:linear-gradient(135deg,#059669,#047857)" onclick="document.getElementById('excelInput').click()">📥 ייבוא Excel</button>
+  <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
 </div>
 <div class="stats-bar" id="statsBar">טוען...</div>
 
@@ -603,6 +605,38 @@ function showToast(msg, type = '') {
   el.className = 'toast ' + type;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── IMPORT EXCEL ──────────────────────────────────────────────────────────────
+async function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ""; // אפשר לבחור שוב את אותו קובץ
+
+  if (!confirm(`ייבוא לקוחות מ: ${file.name}\nלקוחות קיימים לא יימחקו — רק יתווספו חדשים.\nהמשך?`)) return;
+
+  showToast("⏳ מייבא לקוחות...", "");
+  const fd = new FormData();
+  fd.append("file", file);
+
+  try {
+    const r = await fetch("/admin/api/import-excel", { method: "POST", body: fd });
+    const res = await r.json();
+
+    if (res.ok) {
+      showToast(`✅ יובאו ${res.inserted} לקוחות בהצלחה`, "success");
+      if (res.skipped > 0) setTimeout(() => showToast(`⚠️ ${res.skipped} שורות דולגו (ללא שם)`, ""), 3200);
+      if (res.errors && res.errors.length > 0) {
+        console.warn("שגיאות ייבוא:", res.errors);
+        setTimeout(() => showToast(`⚠️ ${res.errors.length} שגיאות — ראה Console`, ""), 3200);
+      }
+      loadCustomers();
+    } else {
+      showToast("❌ " + (res.error || "שגיאה בייבוא"), "error");
+    }
+  } catch(e) {
+    showToast("❌ שגיאת רשת: " + e.message, "error");
+  }
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
