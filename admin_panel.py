@@ -229,19 +229,19 @@ async def api_customers_create(request: Request):
     if not name:
         return JSONResponse({"error": "שם לקוח הוא שדה חובה"}, status_code=400)
 
-    w = {f"week_{i}": (1 if i in weeks else 0) for i in range(1, 8)}
+    w = {f"week_{i}": (1 if i in weeks else 0) for i in range(1, 7)}
 
     db = get_db()
     try:
         cur = db.execute(
             """INSERT INTO customers
                (card_code, name, city, address, region, assigned_visit_day,
-                week_1, week_2, week_3, week_4, week_5, week_6, week_7,
+                week_1, week_2, week_3, week_4, week_5, week_6,
                 delivery_day, visit_day, traffic_light)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (card_code, name, city, address, region, assigned_day,
              w["week_1"], w["week_2"], w["week_3"], w["week_4"],
-             w["week_5"], w["week_6"], w["week_7"],
+             w["week_5"], w["week_6"],
              delivery_day, assigned_day, "ירוק"),
         )
         new_id = cur.lastrowid
