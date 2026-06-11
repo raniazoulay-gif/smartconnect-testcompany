@@ -68,9 +68,9 @@ def cleanup_deleted_customers():
 
 # ── Helper ───────────────────────────────────────────────────────────────────
 def _row_to_weeks(r) -> dict:
-    """מחלץ week_1..week_7 מ-Row, עם fallback ל-0 אם העמודה חסרה"""
+    """מחלץ week_1..week_6 מ-Row, עם fallback ל-0 אם העמודה חסרה"""
     result = {}
-    for i in range(1, 8):
+    for i in range(1, 7):
         try:
             result[f"week_{i}"] = int(r[f"week_{i}"] or 0)
         except Exception:
@@ -162,7 +162,7 @@ async def api_customers_list(
     sql = (
         "SELECT id, card_code, name, city, address, region, "
         "assigned_visit_day, week_1, week_2, week_3, week_4, "
-        "week_5, week_6, week_7, delivery_day "
+        "week_5, week_6, delivery_day "
         "FROM customers "
         "WHERE (deleted_at IS NULL OR deleted_at = '')"
     )
@@ -187,7 +187,7 @@ async def api_customers_list(
     result = []
     for r in rows:
         w = _row_to_weeks(r)
-        weeks_active = [i for i in range(1, 8) if w[f"week_{i}"]]
+        weeks_active = [i for i in range(1, 7) if w[f"week_{i}"]]
         result.append({
             "id":            r["id"],
             "card_code":     r["card_code"]         or "",
@@ -203,7 +203,6 @@ async def api_customers_list(
             "week_4":        w["week_4"],
             "week_5":        w["week_5"],
             "week_6":        w["week_6"],
-            "week_7":        w["week_7"],
             "weeks_display": " ".join([f"ש{i}" for i in weeks_active]) if weeks_active else "—",
             "delivery_day":  r["delivery_day"]      or "",
         })
@@ -271,7 +270,7 @@ async def api_customers_update(request: Request, cid: int):
     if not name:
         return JSONResponse({"error": "שם לקוח הוא שדה חובה"}, status_code=400)
 
-    w = {f"week_{i}": (1 if i in weeks else 0) for i in range(1, 8)}
+    w = {f"week_{i}": (1 if i in weeks else 0) for i in range(1, 7)}
 
     db = get_db()
     try:
@@ -280,12 +279,12 @@ async def api_customers_update(request: Request, cid: int):
                card_code=?, name=?, city=?, address=?, region=?,
                assigned_visit_day=?,
                week_1=?, week_2=?, week_3=?, week_4=?,
-               week_5=?, week_6=?, week_7=?,
+               week_5=?, week_6=?,
                delivery_day=?
                WHERE id=?""",
             (card_code, name, city, address, region, assigned_day,
              w["week_1"], w["week_2"], w["week_3"], w["week_4"],
-             w["week_5"], w["week_6"], w["week_7"],
+             w["week_5"], w["week_6"],
              delivery_day, cid),
         )
         db.commit()
@@ -305,7 +304,7 @@ async def api_customers_delete(request: Request, cid: int):
     try:
         row = db.execute(
             "SELECT name, assigned_visit_day, week_1, week_2, week_3, week_4, "
-            "week_5, week_6, week_7, delivery_day FROM customers WHERE id=?",
+            "week_5, week_6, delivery_day FROM customers WHERE id=?",
             (cid,),
         ).fetchone()
 
@@ -323,7 +322,7 @@ async def api_customers_delete(request: Request, cid: int):
             """UPDATE customers SET
                assigned_visit_day=NULL,
                week_1=0, week_2=0, week_3=0, week_4=0,
-               week_5=0, week_6=0, week_7=0,
+               week_5=0, week_6=0,
                deleted_at=?, deleted_backup=?
                WHERE id=?""",
             (datetime.now().isoformat(), backup, cid),
@@ -357,13 +356,13 @@ async def api_customers_restore(request: Request, cid: int):
             """UPDATE customers SET
                assigned_visit_day=?,
                week_1=?, week_2=?, week_3=?, week_4=?,
-               week_5=?, week_6=?, week_7=?,
+               week_5=?, week_6=?,
                delivery_day=?,
                deleted_at=NULL, deleted_backup=NULL
                WHERE id=?""",
             (b.get("assigned_visit_day"),
              b.get("week_1", 0), b.get("week_2", 0), b.get("week_3", 0), b.get("week_4", 0),
-             b.get("week_5", 0), b.get("week_6", 0), b.get("week_7", 0),
+             b.get("week_5", 0), b.get("week_6", 0),
              b.get("delivery_day"), cid),
         )
         db.commit()
